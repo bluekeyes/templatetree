@@ -16,10 +16,8 @@ const (
 	// CommentTagExtends is the tag used in template comments to mark a
 	// template's parent.
 	CommentTagExtends = "templatetree:extends"
-)
 
-var (
-	// DefaultRootTemplateName is the name of the base template when none is
+	// DefaultRootTemplateName is the name of the root template when none is
 	// provided by the caller.
 	DefaultRootTemplateName = "[templatetree:root]"
 )
@@ -126,8 +124,7 @@ type node struct {
 
 func loadAll(dir, pattern string, root template, register func(string, template)) error {
 	nodes := make(map[string]*node)
-
-	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	walkFn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -142,15 +139,17 @@ func loadAll(dir, pattern string, root template, register func(string, template)
 		if match {
 			name := filepath.ToSlash(strings.TrimPrefix(path, dir))
 			name = strings.TrimPrefix(name, "/")
-
 			nodes[name] = &node{name: name, path: path}
 		}
-
 		return nil
-	}); err != nil {
+	}
+
+	// find all the templates
+	if err := filepath.Walk(dir, walkFn); err != nil {
 		return err
 	}
 
+	// load all content and create links
 	for _, n := range nodes {
 		b, err := ioutil.ReadFile(n.path)
 		if err != nil {
@@ -164,11 +163,12 @@ func loadAll(dir, pattern string, root template, register func(string, template)
 			if p, ok := nodes[parent]; ok {
 				n.parent = p
 			} else {
-				return fmt.Errorf("templatetree: template %s extends unknown template %s", n.name, parent)
+				return fmt.Errorf("templatetree: template %q extends unknown template %s", n.name, parent)
 			}
 		}
 	}
 
+	// parse templates from the root nodes in/down
 	for {
 		n := findNext(nodes)
 		if n == nil {
@@ -186,21 +186,14 @@ func loadAll(dir, pattern string, root template, register func(string, template)
 			return err
 		}
 		if err := t.Parse(n.content); err != nil {
-			// the current template API doesn't provide a way to change names
-			// so try to edit the error message so the correct name appears
-			// this is a dirty hack, but in the worst case it has no effect
-			msg := err.Error()
-			old := "template: " + t.Name()
-			if strings.HasPrefix(msg, old) {
-				return fmt.Errorf("template: %s%s", n.name, strings.TrimPrefix(msg, old))
-			}
-			return err
+			return formatParseError(n, t, err)
 		}
 
-		register(n.name, t)
 		n.template = t
+		register(n.name, t)
 	}
 
+	// check for cycles
 	if len(nodes) > 0 {
 		var names []string
 		for _, n := range nodes {
@@ -234,4 +227,16 @@ func parseHeader(content string) (parent string) {
 
 	parent = content[len(prefix) : len(prefix)+idx]
 	return
+}
+
+// The current template API doesn't provide a way to change names, so try to
+// edit the error message so the correct name appears for users. This is dirty,
+// but is strictly for usability, not correctness.
+func formatParseError(n *node, t template, err error) error {
+	msg := err.Error()
+	old := "template: " + t.Name()
+	if strings.HasPrefix(msg, old) {
+		return fmt.Errorf("template: %s%s", n.name, strings.TrimPrefix(msg, old))
+	}
+	return err
 }

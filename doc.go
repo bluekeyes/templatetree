@@ -4,16 +4,16 @@
 //
 //     // in templates/base.tmpl
 //     base := `Header
-//     {{ block "body" }}{{end}}
+//     {{block "body" .}}Body{{end}}
 //     Footer`
 //
 //     // in templates/a.tmpl
 //     a := `{{/* templatetree:extends base.tmpl */}}
-//     {{ block "body" }}Body A{{end}}`
+//     {{define "body"}}Body A{{end}}`
 //
 //     // in templates/b.tmpl
 //     b := `{{/* templatetree:extends base.tmpl */}}
-//     {{ block "body" }}Body B{{end}}`
+//     {{define "body"}}Body B{{end}}`
 //
 //     t, err := templatetree.LoadText("template", "*.tmpl", nil)
 //     // ... handle err

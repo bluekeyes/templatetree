@@ -1,6 +1,6 @@
 // Package templatetree loads standard library templates in a way that creates
-// a template hierarchy or tree. Templates may extend other templates by using
-// a special comment as the first line of the template:
+// a template hierarchy with inheritance. Templates may extend other templates
+// by using a special comment as the first line of the template:
 //
 //     // in templates/base.tmpl
 //     base := `Header
@@ -15,7 +15,7 @@
 //     b := `{{/* templatetree:extends base.tmpl */}}
 //     {{define "body"}}Body B{{end}}`
 //
-//     t, err := templatetree.LoadText("template", "*.tmpl", nil)
+//     t, err := templatetree.LoadText("templates", "*.tmpl", nil)
 //     // ... handle err
 //
 //     t.ExecuteTemplate(os.Stdout, "a.tmpl", nil)
@@ -38,4 +38,7 @@
 //
 // Templates are named after their slash-separated file path relative to
 // directory that was loaded.
+//
+// To define functions or set other options on the templates, pass a non-nil
+// root template as the final argument to the Load* function.
 package templatetree

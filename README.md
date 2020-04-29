@@ -82,6 +82,8 @@ Output:
       </body>
     </html>
 
+You can also load templates from other sources using `templatetree.ParseHTML`.
+See the package documentation for details and an example.
 
 ## Stability
 

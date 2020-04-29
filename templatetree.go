@@ -22,34 +22,60 @@ const (
 	DefaultRootTemplateName = "[templatetree:root]"
 )
 
+// File is an unparsed template definition.
+type File struct {
+	// Name is the template name. Child templates use this in the extends tag
+	// and it identifies the template in ExecuteTemplate calls.
+	Name string
+
+	// Content is the unparsed template definition.
+	Content string
+}
+
 // LoadText recursively loads all text templates in dir with names matching
 // pattern, respecting inheritance. If the root template is nil, a new default
-// template is used.
-//
-// Templates are named as normalized paths relative to dir.
+// template is used. Templates are named as normalized paths relative to dir.
 func LoadText(dir, pattern string, root *text.Template) (TextTree, error) {
+	files, err := loadFiles(dir, pattern)
+	if err != nil {
+		return nil, err
+	}
+	return ParseText(files, root)
+}
+
+// ParseText parses files into a TextTree, respecting inheritance. If the root
+// template is nil, a new default template is used.
+func ParseText(files []*File, root *text.Template) (TextTree, error) {
 	if root == nil {
 		root = text.New(DefaultRootTemplateName)
 	}
 
 	tree := make(TextTree)
-	return tree, loadAll(dir, pattern, textTemplate{root}, func(name string, t template) {
+	return tree, parseAll(files, textTemplate{root}, func(name string, t template) {
 		tree[name] = t.(textTemplate).Template
 	})
 }
 
 // LoadHTML recursively loads all HTML templates in dir with names matching
 // pattern, respecting inheritance. If the root template is nil, a new default
-// template is used.
-//
-// Templates are named as normalized paths relative to dir.
+// template is used. Templates are named as normalized paths relative to dir.
 func LoadHTML(dir, pattern string, root *html.Template) (HTMLTree, error) {
+	files, err := loadFiles(dir, pattern)
+	if err != nil {
+		return nil, err
+	}
+	return ParseHTML(files, root)
+}
+
+// ParseHTML parses files into a HTMLTree, respecting inheritance. If the root
+// template is nil, a new default template is used.
+func ParseHTML(files []*File, root *html.Template) (HTMLTree, error) {
 	if root == nil {
 		root = html.New(DefaultRootTemplateName)
 	}
 
 	tree := make(HTMLTree)
-	return tree, loadAll(dir, pattern, htmlTemplate{root}, func(name string, t template) {
+	return tree, parseAll(files, htmlTemplate{root}, func(name string, t template) {
 		tree[name] = t.(htmlTemplate).Template
 	})
 }
@@ -114,16 +140,14 @@ func (t htmlTemplate) Parse(content string) error {
 }
 
 type node struct {
-	name    string
-	path    string
-	content string
-
+	name     string
+	content  string
 	template template
 	parent   *node
 }
 
-func loadAll(dir, pattern string, root template, register func(string, template)) error {
-	nodes := make(map[string]*node)
+func loadFiles(dir, pattern string) ([]*File, error) {
+	var files []*File
 	walkFn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -139,25 +163,31 @@ func loadAll(dir, pattern string, root template, register func(string, template)
 		if match {
 			name := filepath.ToSlash(strings.TrimPrefix(path, dir))
 			name = strings.TrimPrefix(name, "/")
-			nodes[name] = &node{name: name, path: path}
+
+			d, err := ioutil.ReadFile(path)
+			if err != nil {
+				return err
+			}
+
+			files = append(files, &File{Name: name, Content: string(d)})
 		}
 		return nil
 	}
 
-	// find all the templates
 	if err := filepath.Walk(dir, walkFn); err != nil {
-		return err
+		return nil, err
+	}
+	return files, nil
+}
+
+func parseAll(files []*File, root template, register func(string, template)) error {
+	nodes := make(map[string]*node)
+	for _, f := range files {
+		nodes[f.Name] = &node{name: f.Name, content: f.Content}
 	}
 
-	// load all content and create links
+	// create links between parents and children
 	for _, n := range nodes {
-		b, err := ioutil.ReadFile(n.path)
-		if err != nil {
-			return err
-		}
-
-		n.content = string(b)
-
 		parent := parseHeader(n.content)
 		if parent != "" {
 			if p, ok := nodes[parent]; ok {

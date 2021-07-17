@@ -4,9 +4,9 @@ import (
 	"fmt"
 	html "html/template"
 	"io"
-	"io/ioutil"
+	"io/fs"
 	"os"
-	"path/filepath"
+	"path"
 	"strconv"
 	"strings"
 	text "text/template"
@@ -36,7 +36,14 @@ type File struct {
 // pattern, respecting inheritance. If the root template is nil, a new default
 // template is used. Templates are named as normalized paths relative to dir.
 func LoadText(dir, pattern string, root *text.Template) (TextTree, error) {
-	files, err := loadFiles(dir, pattern)
+	return ParseTextFS(os.DirFS(dir), pattern, root)
+}
+
+// ParseTextFS recursively parses all text templates in fsys with names
+// matching pattern, respecting inheritance. If the root template is nil, a new
+// default template is used. Templates are named by their paths in fsys.
+func ParseTextFS(fsys fs.FS, pattern string, root *text.Template) (TextTree, error) {
+	files, err := loadFiles(fsys, pattern)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +67,14 @@ func ParseText(files []*File, root *text.Template) (TextTree, error) {
 // pattern, respecting inheritance. If the root template is nil, a new default
 // template is used. Templates are named as normalized paths relative to dir.
 func LoadHTML(dir, pattern string, root *html.Template) (HTMLTree, error) {
-	files, err := loadFiles(dir, pattern)
+	return ParseHTMLFS(os.DirFS(dir), pattern, root)
+}
+
+// ParseHTMLFS recursively loads all HTML templates in fsys with names matching
+// pattern, respecting inheritance. If the root template is nil, a new default
+// template is used. Templates are named by their paths in fsys.
+func ParseHTMLFS(fsys fs.FS, pattern string, root *html.Template) (HTMLTree, error) {
+	files, err := loadFiles(fsys, pattern)
 	if err != nil {
 		return nil, err
 	}
@@ -146,35 +160,31 @@ type node struct {
 	parent   *node
 }
 
-func loadFiles(dir, pattern string) ([]*File, error) {
+func loadFiles(templates fs.FS, pattern string) ([]*File, error) {
 	var files []*File
-	walkFn := func(path string, info os.FileInfo, err error) error {
+	walkFn := func(name string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
 
-		match, err := filepath.Match(pattern, filepath.Base(path))
+		match, err := path.Match(pattern, path.Base(name))
 		if err != nil {
 			return err
 		}
 		if match {
-			name := filepath.ToSlash(strings.TrimPrefix(path, dir))
-			name = strings.TrimPrefix(name, "/")
-
-			d, err := ioutil.ReadFile(path)
+			b, err := fs.ReadFile(templates, name)
 			if err != nil {
 				return err
 			}
-
-			files = append(files, &File{Name: name, Content: string(d)})
+			files = append(files, &File{Name: name, Content: string(b)})
 		}
 		return nil
 	}
 
-	if err := filepath.Walk(dir, walkFn); err != nil {
+	if err := fs.WalkDir(templates, ".", walkFn); err != nil {
 		return nil, err
 	}
 	return files, nil

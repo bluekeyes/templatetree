@@ -7,12 +7,13 @@ import (
 )
 
 func TestText(t *testing.T) {
-	root := text.New("root")
-	root.Funcs(text.FuncMap{
-		"Value": func() string { return "Test Value" },
+	factory := TextFactory(func(name string) *text.Template {
+		return text.New("root").Funcs(text.FuncMap{
+			"Value": func() string { return "Test Value" },
+		})
 	})
 
-	tmpl, err := LoadText("testdata/basic", "*.tmpl", root)
+	tmpl, err := Parse("testdata/basic", "*.tmpl", factory)
 	if err != nil {
 		t.Fatalf("error loading templates: %v", err)
 	}
@@ -47,7 +48,7 @@ func TestText(t *testing.T) {
 }
 
 func TestDetectCycles(t *testing.T) {
-	_, err := LoadText("testdata/cycles", "*.tmpl", nil)
+	_, err := Parse("testdata/cycles", "*.tmpl", TextFactory(nil))
 	if err == nil {
 		t.Fatal("template cycle was not detected")
 	}
@@ -64,7 +65,7 @@ func TestDetectCycles(t *testing.T) {
 	}
 }
 
-func render(tree TextTree, name string) (string, error) {
+func render(tree Tree, name string) (string, error) {
 	var b strings.Builder
 	if err := tree.ExecuteTemplate(&b, name, nil); err != nil {
 		return "", err
@@ -72,7 +73,7 @@ func render(tree TextTree, name string) (string, error) {
 	return b.String(), nil
 }
 
-func assertRender(t *testing.T, tree TextTree, name string) string {
+func assertRender(t *testing.T, tree Tree, name string) string {
 	out, err := render(tree, name)
 	if err != nil {
 		t.Fatalf("error rendering %q: %v", name, err)

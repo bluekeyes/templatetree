@@ -9,32 +9,23 @@ import (
 )
 
 func Example() {
-	files := []*templatetree.File{
-		&templatetree.File{
-			Name: "base.tmpl",
-			Content: strings.TrimSpace(`
+	files := map[string]string{
+		"base.tmpl": strings.TrimSpace(`
 Header
 {{block "body" .}}Body{{end}}
 Footer
 `),
-		},
-		&templatetree.File{
-			Name: "a.tmpl",
-			Content: strings.TrimSpace(`
+		"a.tmpl": strings.TrimSpace(`
 {{/* templatetree:extends base.tmpl */}}
 {{define "body"}}Body A{{end}}
 `),
-		},
-		&templatetree.File{
-			Name: "b.tmpl",
-			Content: strings.TrimSpace(`
+		"b.tmpl": strings.TrimSpace(`
 {{/* templatetree:extends base.tmpl */}}
 {{define "body"}}Body B{{end}}
 `),
-		},
 	}
 
-	t, err := templatetree.ParseText(files, nil)
+	t, err := templatetree.ParseFiles(files, templatetree.TextFactory(nil))
 	if err != nil {
 		panic(err)
 	}

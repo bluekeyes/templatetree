@@ -13,6 +13,6 @@
 // path relative to the directory. If parsing a slice of templatetree.File
 // structs, the Name field in the struct sets the template's name.
 //
-// To define functions or set other options on the templates, pass a non-nil
-// root template as the final argument to the Load* or Parse* functions.
+// To define functions or set other options on the templates, provide a non-nil
+// factory function.
 package templatetree

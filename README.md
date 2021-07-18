@@ -1,4 +1,4 @@
-# templatetree [![GoDoc](https://godoc.org/github.com/bluekeyes/templatetree?status.svg)](http://godoc.org/github.com/bluekeyes/templatetree)
+# templatetree [![Go Reference](https://pkg.go.dev/badge/github.com/bluekeyes/templatetree.svg)](https://pkg.go.dev/github.com/bluekeyes/templatetree)
 
 templatetree is a standard library template loader that creates simple template
 inheritance trees. Base templates use the `block` or `template` directives to

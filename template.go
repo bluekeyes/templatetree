@@ -61,6 +61,14 @@ func (t htmlTemplate) Tree() *parse.Tree { return t.Template.Tree }
 
 func (t htmlTemplate) AddParseTree(name string, tree *parse.Tree) error {
 	_, err := t.Template.AddParseTree(name, tree)
+	if name == t.Name() {
+		// html/template (as of 1.16.6) has an issue where it does not set the
+		// Tree of the top-level template when the added tree replaces it.
+		//
+		// TODO(bkeyes): report this upstream and see if it's actually a bug,
+		// since AddParseTree is not _really_ meant for public use.
+		t.Template.Tree = tree
+	}
 	return err
 }
 

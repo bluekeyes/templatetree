@@ -1,6 +1,7 @@
 package templatetree
 
 import (
+	html "html/template"
 	"strings"
 	"testing"
 	text "text/template"
@@ -39,6 +40,32 @@ func TestText(t *testing.T) {
 	t.Run("nestedTemplate", func(t *testing.T) {
 		out := assertRender(t, tmpl, "nested/c.tmpl")
 		assertOutput(t, out, []string{"Base", "C", "Default"})
+	})
+
+	t.Run("multilevelInheritance", func(t *testing.T) {
+		out := assertRender(t, tmpl, "nested/d.tmpl")
+		assertOutput(t, out, []string{"Base", "D", "Test Value"})
+	})
+}
+
+func TestHTML(t *testing.T) {
+	factory := HTMLFactory(func(name string) *html.Template {
+		return html.New("root").Funcs(html.FuncMap{
+			"Value": func() string { return "Test Value" },
+		})
+	})
+
+	tmpl, err := Parse("testdata/basic", "*.tmpl", factory)
+	if err != nil {
+		t.Fatalf("error loading templates: %v", err)
+	}
+
+	t.Run("basicInheritance", func(t *testing.T) {
+		out := assertRender(t, tmpl, "a.tmpl")
+		assertOutput(t, out, []string{"Base", "A"})
+
+		out = assertRender(t, tmpl, "b.tmpl")
+		assertOutput(t, out, []string{"Base", "B"})
 	})
 
 	t.Run("multilevelInheritance", func(t *testing.T) {

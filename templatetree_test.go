@@ -9,7 +9,7 @@ import (
 
 func TestText(t *testing.T) {
 	factory := TextFactory(func(name string) *text.Template {
-		return text.New("root").Funcs(text.FuncMap{
+		return text.New(name).Funcs(text.FuncMap{
 			"Value": func() string { return "Test Value" },
 		})
 	})
@@ -20,37 +20,37 @@ func TestText(t *testing.T) {
 	}
 
 	t.Run("baseTemplate", func(t *testing.T) {
-		out := assertRender(t, tmpl, "base.tmpl")
+		out := assertRender(t, tmpl, "base.tmpl", nil)
 		assertOutput(t, out, []string{"Base", "Child"})
 	})
 
 	t.Run("basicInheritance", func(t *testing.T) {
-		out := assertRender(t, tmpl, "a.tmpl")
+		out := assertRender(t, tmpl, "a.tmpl", nil)
 		assertOutput(t, out, []string{"Base", "A"})
 
-		out = assertRender(t, tmpl, "b.tmpl")
+		out = assertRender(t, tmpl, "b.tmpl", nil)
 		assertOutput(t, out, []string{"Base", "B"})
 	})
 
 	t.Run("funcInheritance", func(t *testing.T) {
-		out := assertRender(t, tmpl, "funcs.tmpl")
+		out := assertRender(t, tmpl, "funcs.tmpl", nil)
 		assertOutput(t, out, []string{"Base", "Test Value"})
 	})
 
 	t.Run("nestedTemplate", func(t *testing.T) {
-		out := assertRender(t, tmpl, "nested/c.tmpl")
+		out := assertRender(t, tmpl, "nested/c.tmpl", nil)
 		assertOutput(t, out, []string{"Base", "C", "Default"})
 	})
 
 	t.Run("multilevelInheritance", func(t *testing.T) {
-		out := assertRender(t, tmpl, "nested/d.tmpl")
+		out := assertRender(t, tmpl, "nested/d.tmpl", nil)
 		assertOutput(t, out, []string{"Base", "D", "Test Value"})
 	})
 }
 
 func TestHTML(t *testing.T) {
 	factory := HTMLFactory(func(name string) *html.Template {
-		return html.New("root").Funcs(html.FuncMap{
+		return html.New(name).Funcs(html.FuncMap{
 			"Value": func() string { return "Test Value" },
 		})
 	})
@@ -60,17 +60,52 @@ func TestHTML(t *testing.T) {
 		t.Fatalf("error loading templates: %v", err)
 	}
 
+	htmlTmpl, err := Parse("testdata/html", "*.html.tmpl", factory)
+	if err != nil {
+		t.Fatalf("error loading templates: %v", err)
+	}
+
 	t.Run("basicInheritance", func(t *testing.T) {
-		out := assertRender(t, tmpl, "a.tmpl")
+		out := assertRender(t, tmpl, "a.tmpl", nil)
 		assertOutput(t, out, []string{"Base", "A"})
 
-		out = assertRender(t, tmpl, "b.tmpl")
+		out = assertRender(t, tmpl, "b.tmpl", nil)
 		assertOutput(t, out, []string{"Base", "B"})
 	})
 
 	t.Run("multilevelInheritance", func(t *testing.T) {
-		out := assertRender(t, tmpl, "nested/d.tmpl")
+		out := assertRender(t, tmpl, "nested/d.tmpl", nil)
 		assertOutput(t, out, []string{"Base", "D", "Test Value"})
+	})
+
+	t.Run("staticHTML", func(t *testing.T) {
+		out := assertRender(t, htmlTmpl, "index.html.tmpl", nil)
+		assertOutput(t, out, []string{
+			"<!doctype html>",
+			"<html>",
+			"    <head>",
+			"        <title>Index Page</title>",
+			"    </head>",
+			"    <body>",
+			"        <p>This is a test page!</p>",
+			"    </body>",
+			"</html>",
+		})
+	})
+
+	t.Run("dynamicHTML", func(t *testing.T) {
+		out := assertRender(t, htmlTmpl, "data.html.tmpl", map[string]string{"Word": "Testing"})
+		assertOutput(t, out, []string{
+			"<!doctype html>",
+			"<html>",
+			"    <head>",
+			"        <title>Data Page | Testing</title>",
+			"    </head>",
+			"    <body>",
+			"        <p>This contains the word <i>Testing</i></p>",
+			"    </body>",
+			"</html>",
+		})
 	})
 }
 
@@ -92,16 +127,16 @@ func TestDetectCycles(t *testing.T) {
 	}
 }
 
-func render(tree Tree, name string) (string, error) {
+func render(tree Tree, name string, data interface{}) (string, error) {
 	var b strings.Builder
-	if err := tree.ExecuteTemplate(&b, name, nil); err != nil {
+	if err := tree.ExecuteTemplate(&b, name, data); err != nil {
 		return "", err
 	}
 	return b.String(), nil
 }
 
-func assertRender(t *testing.T, tree Tree, name string) string {
-	out, err := render(tree, name)
+func assertRender(t *testing.T, tree Tree, name string, data interface{}) string {
+	out, err := render(tree, name, data)
 	if err != nil {
 		t.Fatalf("error rendering %q: %v", name, err)
 		return ""

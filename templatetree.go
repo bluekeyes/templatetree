@@ -109,13 +109,7 @@ func ParseFiles(files map[string]string, f TemplateFactory) (Tree, error) {
 		delete(nodes, n.name)
 
 		t := f.newTemplate(n.name)
-		if n.parent != nil {
-			if err := copyTemplates(t, n.parent.template); err != nil {
-				return nil, err
-			}
-		}
-
-		if err := t.Parse(n.content); err != nil {
+		if err := parseInto(t, n); err != nil {
 			return nil, err
 		}
 
@@ -142,17 +136,12 @@ type node struct {
 	parent   *node
 }
 
-func copyTemplates(dst, src template) error {
-	for _, t := range src.Templates() {
-		name := t.Name()
-		if name == src.Name() {
-			name = dst.Name() // copy top-level template in src to top-level in dst
-		}
-		if err := dst.AddParseTree(name, t.Tree()); err != nil {
-			return err
-		}
+func parseInto(dst template, src *node) error {
+	if src.parent != nil {
+		// parents are already parsed, so we know they are valid
+		_ = parseInto(dst, src.parent)
 	}
-	return nil
+	return dst.Parse(src.content)
 }
 
 func findNext(nodes map[string]*node) *node {

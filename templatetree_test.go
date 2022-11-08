@@ -46,6 +46,18 @@ func TestText(t *testing.T) {
 		out := assertRender(t, tmpl, "nested/d.tmpl", nil)
 		assertOutput(t, out, []string{"Base", "D", "Test Value"})
 	})
+
+	t.Run("concreteType", func(t *testing.T) {
+		base, ok := tmpl["base.tmpl"]
+		if !ok {
+			t.Fatalf("missing template: base.tmpl")
+		}
+
+		_, ok = base.(*text.Template)
+		if !ok {
+			t.Errorf("concrete value is not a *text.Template: %T", base)
+		}
+	})
 }
 
 func TestHTML(t *testing.T) {
@@ -106,6 +118,18 @@ func TestHTML(t *testing.T) {
 			"    </body>",
 			"</html>",
 		})
+	})
+
+	t.Run("concreteType", func(t *testing.T) {
+		base, ok := tmpl["base.tmpl"]
+		if !ok {
+			t.Fatalf("missing template: base.tmpl")
+		}
+
+		_, ok = base.(*html.Template)
+		if !ok {
+			t.Errorf("concrete value is not a *text.Template: %T", base)
+		}
 	})
 }
 

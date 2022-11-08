@@ -33,8 +33,7 @@ type Template[T StdTemplate] interface {
 }
 
 // Tree is a hierarchy of templates, mapping name to template. The concrete
-// type of the values is determined by the TemplateFactory used when parsing
-// and will be either *text/template.Template or *html/template.Template.
+// type of the values will be T.
 type Tree[T StdTemplate] map[string]Template[T]
 
 // ExecuteTemplate renders the template with the given name. See the

@@ -37,7 +37,7 @@ Use `Parse` to load and render the templates:
 package main
 
 import (
-	"html/template"
+	html "html/template"
 	"os"
 	"time"
 
@@ -45,13 +45,13 @@ import (
 )
 
 func main() {
-	factory := templatetree.HTMLFactory(func(name string) *template.Template {
+	factory := func(name string) templatetree.Template[*html.Template] {
 		return template.New(name).Funcs(template.FuncMap{
 			"now": func() string {
 				return time.Now().Format(time.RFC3339)
 			},
 		})
-	})
+	}
 
 	t, err := templatetree.Parse("templates", "*.html.tmpl", factory)
 	if err != nil {
@@ -89,6 +89,6 @@ for details and an example.
 
 ## Stability
 
-The API was redesigned in v0.4.0 based on experience with previous versions
-and should be more stable as a result. That said, I still consider this beta
-software, with the possibility for more changes.
+Beta, API changes possible. v0.4.0 redesigned and simplified the API based on
+experience with previous versions. v0.5.0 inclued another API break to use
+generics, but is functionally the same as the previous version.

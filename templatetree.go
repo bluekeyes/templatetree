@@ -18,14 +18,28 @@ const (
 	CommentTagExtends = "templatetree:extends"
 )
 
+// StdTemplate is a union of the standard library template types.
+type StdTemplate interface {
+	*text.Template | *html.Template
+}
+
+// Template contains the common functions of text/template.Template and
+// html/template.Template used by this package.
+type Template[T StdTemplate] interface {
+	Name() string
+	Execute(w io.Writer, data any) error
+	ExecuteTemplate(w io.Writer, name string, data any) error
+	Parse(text string) (T, error)
+}
+
 // Tree is a hierarchy of templates, mapping name to template. The concrete
 // type of the values is determined by the TemplateFactory used when parsing
 // and will be either *text/template.Template or *html/template.Template.
-type Tree map[string]Template
+type Tree[T StdTemplate] map[string]Template[T]
 
 // ExecuteTemplate renders the template with the given name. See the
 // text/template package for more details.
-func (tree Tree) ExecuteTemplate(wr io.Writer, name string, data interface{}) error {
+func (tree Tree[T]) ExecuteTemplate(wr io.Writer, name string, data any) error {
 	if tmpl, ok := tree[name]; ok {
 		return tmpl.Execute(wr, data)
 	}
@@ -33,41 +47,27 @@ func (tree Tree) ExecuteTemplate(wr io.Writer, name string, data interface{}) er
 }
 
 // TemplateFactory creates new empty templates.
-type TemplateFactory interface {
-	newTemplate(name string) template
+type TemplateFactory[T StdTemplate] func(name string) Template[T]
+
+// DefaultTextFactory uses text/template.New to create templates.
+func DefaultTextFactory(name string) Template[*text.Template] {
+	return text.New(name)
 }
 
-// TextFactory is a TemplateFactory that creates text templates. If nil, it
-// uses text/template.New to create templates.
-type TextFactory func(name string) *text.Template
-
-func (f TextFactory) newTemplate(name string) template {
-	if f == nil {
-		return textTemplate{text.New(name)}
-	}
-	return textTemplate{f(name)}
-}
-
-// HTMLFactory is a TemplateFactory that creates HTML templates. If nil, it
-// uses html/template.New to create templates.
-type HTMLFactory func(name string) *html.Template
-
-func (f HTMLFactory) newTemplate(name string) template {
-	if f == nil {
-		return htmlTemplate{html.New(name)}
-	}
-	return htmlTemplate{f(name)}
+// DefaultHTMLFactory uses html/template.New to create templates.
+func DefaultHTMLFactory(name string) Template[*html.Template] {
+	return html.New(name)
 }
 
 // Parse recursively loads all templates in dir with names matching pattern,
 // respecting inheritance. Templates are named by their paths relative to dir.
-func Parse(dir, pattern string, f TemplateFactory) (Tree, error) {
+func Parse[T StdTemplate](dir, pattern string, f TemplateFactory[T]) (Tree[T], error) {
 	return ParseFS(os.DirFS(dir), pattern, f)
 }
 
 // ParseFS recursively parses all templates in fsys with names matching
 // pattern, respecting inheritance. Templates are named by their paths in fsys.
-func ParseFS(fsys fs.FS, pattern string, f TemplateFactory) (Tree, error) {
+func ParseFS[T StdTemplate](fsys fs.FS, pattern string, f TemplateFactory[T]) (Tree[T], error) {
 	files, err := loadFiles(fsys, pattern)
 	if err != nil {
 		return nil, err
@@ -77,14 +77,14 @@ func ParseFS(fsys fs.FS, pattern string, f TemplateFactory) (Tree, error) {
 
 // ParseFiles parses all templates in files, respecting inheritance. Templates
 // are named by their key in files, which maps name to content.
-func ParseFiles(files map[string]string, f TemplateFactory) (Tree, error) {
+func ParseFiles[T StdTemplate](files map[string]string, f TemplateFactory[T]) (Tree[T], error) {
 	if f == nil {
 		return nil, fmt.Errorf("templatetree: factory must be non-nil")
 	}
 
-	nodes := make(map[string]*node)
+	nodes := make(map[string]*node[T])
 	for name, f := range files {
-		nodes[name] = &node{name: name, content: f}
+		nodes[name] = &node[T]{name: name, content: f}
 	}
 
 	// create links between parents and children
@@ -100,7 +100,7 @@ func ParseFiles(files map[string]string, f TemplateFactory) (Tree, error) {
 	}
 
 	// parse templates from the root nodes in/down
-	tree := make(Tree)
+	tree := make(Tree[T])
 	for {
 		n := findNext(nodes)
 		if n == nil {
@@ -108,13 +108,13 @@ func ParseFiles(files map[string]string, f TemplateFactory) (Tree, error) {
 		}
 		delete(nodes, n.name)
 
-		t := f.newTemplate(n.name)
+		t := f(n.name)
 		if err := parseInto(t, n); err != nil {
 			return nil, err
 		}
 
 		n.template = t
-		tree[n.name] = t.Unwrap()
+		tree[n.name] = t
 	}
 
 	// check for cycles
@@ -129,22 +129,23 @@ func ParseFiles(files map[string]string, f TemplateFactory) (Tree, error) {
 	return tree, nil
 }
 
-type node struct {
+type node[T StdTemplate] struct {
 	name     string
 	content  string
-	template template
-	parent   *node
+	template Template[T]
+	parent   *node[T]
 }
 
-func parseInto(dst template, src *node) error {
+func parseInto[T StdTemplate](dst Template[T], src *node[T]) error {
 	if src.parent != nil {
 		// parents are already parsed, so we know they are valid
 		_ = parseInto(dst, src.parent)
 	}
-	return dst.Parse(src.content)
+	_, err := dst.Parse(src.content)
+	return err
 }
 
-func findNext(nodes map[string]*node) *node {
+func findNext[T StdTemplate](nodes map[string]*node[T]) *node[T] {
 	for _, n := range nodes {
 		if n.parent == nil || n.parent.template != nil {
 			return n

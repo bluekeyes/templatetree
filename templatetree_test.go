@@ -8,11 +8,11 @@ import (
 )
 
 func TestText(t *testing.T) {
-	factory := TextFactory(func(name string) *text.Template {
+	factory := func(name string) Template[*text.Template] {
 		return text.New(name).Funcs(text.FuncMap{
 			"Value": func() string { return "Test Value" },
 		})
-	})
+	}
 
 	tmpl, err := Parse("testdata/basic", "*.tmpl", factory)
 	if err != nil {
@@ -49,11 +49,11 @@ func TestText(t *testing.T) {
 }
 
 func TestHTML(t *testing.T) {
-	factory := HTMLFactory(func(name string) *html.Template {
+	factory := func(name string) Template[*html.Template] {
 		return html.New(name).Funcs(html.FuncMap{
 			"Value": func() string { return "Test Value" },
 		})
-	})
+	}
 
 	tmpl, err := Parse("testdata/basic", "*.tmpl", factory)
 	if err != nil {
@@ -110,7 +110,7 @@ func TestHTML(t *testing.T) {
 }
 
 func TestDetectCycles(t *testing.T) {
-	_, err := Parse("testdata/cycles", "*.tmpl", TextFactory(nil))
+	_, err := Parse("testdata/cycles", "*.tmpl", DefaultTextFactory)
 	if err == nil {
 		t.Fatal("template cycle was not detected")
 	}
@@ -127,7 +127,7 @@ func TestDetectCycles(t *testing.T) {
 	}
 }
 
-func render(tree Tree, name string, data interface{}) (string, error) {
+func render[T StdTemplate](tree Tree[T], name string, data any) (string, error) {
 	var b strings.Builder
 	if err := tree.ExecuteTemplate(&b, name, data); err != nil {
 		return "", err
@@ -135,7 +135,7 @@ func render(tree Tree, name string, data interface{}) (string, error) {
 	return b.String(), nil
 }
 
-func assertRender(t *testing.T, tree Tree, name string, data interface{}) string {
+func assertRender[T StdTemplate](t *testing.T, tree Tree[T], name string, data any) string {
 	out, err := render(tree, name, data)
 	if err != nil {
 		t.Fatalf("error rendering %q: %v", name, err)

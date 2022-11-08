@@ -25,7 +25,7 @@ Footer
 `),
 	}
 
-	t, err := templatetree.ParseFiles(files, templatetree.TextFactory(nil))
+	t, err := templatetree.ParseFiles(files, templatetree.DefaultTextFactory)
 	if err != nil {
 		panic(err)
 	}
